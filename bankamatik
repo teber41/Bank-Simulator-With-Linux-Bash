@@ -1,0 +1,294 @@
+#!/bin/bash
+
+#Yakup Teber Bankamatik Programi
+#11-05-2016
+
+# SQlite kurulumu kontrolu.
+
+musteriIslemleriFunc(){
+
+eval TcNo=$1
+ad=`sqlite3 $database "SELECT Adi FROM tblmusteriler WHERE TcNo='${TcNo}'"`;
+soyad=`sqlite3 $database "SELECT Soyadi FROM tblmusteriler WHERE TcNo='${TcNo}'"`;
+#$DIALOG --title "ERROR" --msgbox $TcNo 5 30
+
+$DIALOG --clear --title "Merhaba ${ad} ${soyad}" \
+        --menu "Birini Secin" 20 51 6 \
+        1 "Para Yatir" \
+        2 "Para Cek" \
+		3 "Havale Yap" \
+		4 "Bakiye Sorgula" \
+		5 "Bilgilerimi Goruntule" \
+		6 "Hesabimi Sil" 2>/tmp/menuitem.txt
+
+s1=$?
+if [ $s1 -eq 1 ];then
+        anaEkranFunc
+fi
+
+choice=`cat /tmp/menuitem.txt`
+
+case $choice in
+
+1)
+#Para Yatirma
+$DIALOG --title "Para Miktari" --inputbox "Yatirmak Istediginiz Miktari Giriniz" 16 51 2>/tmp/kullaniciGiris.txt
+s2=$?
+if [ $s2 -eq 1 ];then
+        musteriIslemleriFunc "\${TcNo}"
+fi
+miktar=`cat /tmp/kullaniciGiris.txt`
+
+Bakiye=`sqlite3 $database "SELECT Bakiye FROM tblmusteriler WHERE TcNo='${TcNo}'"`;
+sum=`expr $miktar + $Bakiye`
+sqlite3 $database "UPDATE tblmusteriler SET Bakiye ='${sum}' WHERE TcNo='${TcNo}'";
+
+$DIALOG --title "Islem Tamam" --msgbox "Para Yatirma Islemi Tamamlandi" 5 40
+musteriIslemleriFunc "\${TcNo}";;
+
+2)
+#Para Cekme
+$DIALOG --title "Para Miktari" --inputbox "Cekmek Istediginiz Miktari Giriniz" 16 51 2>/tmp/kullaniciGiris.txt
+s3=$?
+if [ $s3 -eq 1 ];then
+        musteriIslemleriFunc "\${TcNo}"
+fi
+miktar=`cat /tmp/kullaniciGiris.txt`
+Bakiye=`sqlite3 $database "SELECT Bakiye FROM tblmusteriler WHERE TcNo='${TcNo}'"`;
+
+if [ $Bakiye -gt $miktar ];then
+	sum=`expr $Bakiye - $miktar`
+	sqlite3 $database "UPDATE tblmusteriler SET Bakiye ='${sum}' WHERE TcNo='${TcNo}';"
+	$DIALOG --title "Islem Tamam" --msgbox "Para Cekme Islemi Tamamlandi" 5 40
+	musteriIslemleriFunc "\${TcNo}"
+else
+	$DIALOG --title "HATA!!" --msgbox "Bakiyeniz Yetersiz" 5 30
+	musteriIslemleriFunc "\${TcNo}"
+fi
+;;
+3)
+#Havale Islemleri
+$DIALOG --title "TcNo" --inputbox "Yatirmak Istediginiz Kisinin TcNo sunu Giriniz" 16 51 2>/tmp/kullaniciGiris.txt
+s4=$?
+if [ $s4 -eq 1 ];then
+        musteriIslemleriFunc "\${TcNo}"
+fi
+havaleTcNo=`cat /tmp/kullaniciGiris.txt`
+gelenTc=`sqlite3 $database "SELECT TcNo FROM tblmusteriler WHERE TcNo='${havaleTcNo}'"`;
+gelenAd=`sqlite3 $database "SELECT Adi FROM tblmusteriler WHERE TcNo='${havaleTcNo}'"`;
+gelenSoyad=`sqlite3 $database "SELECT Soyadi FROM tblmusteriler WHERE TcNo='${havaleTcNo}'"`;
+if [ $havaleTcNo == $gelenTc ];then
+	Bakiye=`sqlite3 $database "SELECT Bakiye FROM tblmusteriler WHERE TcNo='${TcNo}'"`;
+	$DIALOG --title "${gelenAd} ${gelenSoyad}" --inputbox "Yatirmak Istediginiz Miktari Giriniz" 16 51 2>/tmp/kullaniciGiris.txt
+	s5=$?
+	if [ $s5 -eq 1 ];then
+        	musteriIslemleriFunc "\${TcNo}"
+	fi
+	miktar=`cat /tmp/kullaniciGiris.txt`
+	if [ $Bakiye -gt $miktar ];then
+		havaleBakiye=`sqlite3 $database "SELECT Bakiye FROM tblmusteriler WHERE TcNo='${gelenTc}'"`;
+		sum=`expr $havaleBakiye + $miktar`
+		sqlite3 $database "UPDATE tblmusteriler SET Bakiye ='${sum}' WHERE TcNo='${gelenTc}';"
+		sumMy=`expr $Bakiye - $miktar`
+		sqlite3 $database "UPDATE tblmusteriler SET Bakiye ='${sumMy}' WHERE TcNo='${TcNo}';"
+		$DIALOG --title "Basarili" --msgbox "Havale Islemi Basarili" 5 40
+                musteriIslemleriFunc "\${TcNo}"
+	else
+		$DIALOG --title "HATA!!" --msgbox "Bu Islem Icin Bakiyeniz Yetersizdir" 5 50
+		musteriIslemleriFunc "\${TcNo}"
+	fi
+else
+	$DIALOG --title "HATA!!" --msgbox "Boyle Bir Hesap Yok, Yanlıs TCNo" 5 50
+	musteriIslemleriFunc "\${TcNo}"
+fi
+;;
+
+4)
+#Bakiye Goruntuleme
+Bakiye=`sqlite3 $database "SELECT Bakiye FROM tblmusteriler WHERE TcNo='${TcNo}'"`;
+$DIALOG --title "Bakiyeniz" --msgbox $Bakiye 5 20
+musteriIslemleriFunc "\${TcNo}"
+;;
+
+5)
+#Bilgileri Goruntuleme
+gelenAd=`sqlite3 $database "SELECT Adi FROM tblmusteriler WHERE TcNo='${TcNo}'"`;
+gelenSoyad=`sqlite3 $database "SELECT Soyadi FROM tblmusteriler WHERE TcNo='${TcNo}'"`;
+gelenEmail=`sqlite3 $database "SELECT Email FROM tblmusteriler WHERE TcNo='${TcNo}'"`;
+gelenTelNo=`sqlite3 $database "SELECT Telefon FROM tblmusteriler WHERE TcNo='${TcNo}'"`;
+1
+$DIALOG --title "Bilgileriniz :" --msgbox "Adi :${gelenAd} \nSoyadi :${gelenSoyad} \nEmail :${gelenEmail} \nTelNo :${gelenTelNo} \n\n\
+Bilgilerinizi Guncellemek Icin Banka Subelerimizden Birisine Ugrayabilirsiniz." 12 40
+d8=$?
+if [ $d8 -eq 0 ];then
+	musteriIslemleriFunc "\${TcNo}"
+fi
+;;
+
+6)
+#Hesap Silme
+$DIALOG --title "Dogrulama" --inputbox "Dogrulama Icin Tel No Giriniz" 16 51 2>/tmp/kullaniciGiris.txt
+s6=$?
+if [ $s6 -eq 1 ];then
+        musteriIslemleriFunc "\${TcNo}"
+fi
+telNo=`cat /tmp/kullaniciGiris.txt`
+
+gelenTel=`sqlite3 $database "SELECT Telefon FROM tblmusteriler WHERE Tcno='${TcNo}'"`;
+
+if [ $telNo -eq $gelenTel ];then
+	$DIALOG --title "Emin Misiniz" --yesno "Hesabinizi Silmek Istediginize Emin Misiniz" 5 50
+	s7=$?
+	case $s7 in
+	0)sqlite3 $database "DELETE FROM tblmusteriler WHERE Tcno='${TcNo}';";;
+	1)musteriIslemleriFunc "\${TcNo}";;
+	esac
+	anaEkranFunc
+else
+	$DIALOG --title "HATA!!" --msgbox "Girdiginiz Telefon Numarasi Yanlis" 5 40
+	musteriIslemleriFunc "\${TcNo}"
+fi
+;;
+
+esac
+}
+#Yeni Kayit Ekleme
+yeniKayitFunc(){
+
+$DIALOG --title "Ad" --inputbox "Adinizi Giriniz" 16 51 2>/tmp/musteriBilgi.txt
+s8=$?
+if [ $s8 -eq 1 ];then
+	anaEkranFunc
+fi
+Ad=`cat /tmp/musteriBilgi.txt`
+
+$DIALOG --title "Soyad" --inputbox "Soyadinizi Giriniz" 16 51 2>/tmp/musteriBilgi.txt
+s9=$?
+if [ $s9 -eq 1 ];then
+        anaEkranFunc
+fi
+Soyad=`cat /tmp/musteriBilgi.txt`
+
+$DIALOG --title "Sifre" --inputbox "Sifrenizi Giriniz" 16 51 2>/tmp/musteriBilgi.txt
+d1=$?
+if [ $d1 -eq 1 ];then
+        anaEkranFunc
+fi
+Sifre=`cat /tmp/musteriBilgi.txt`
+
+$DIALOG --title "TC" --inputbox "TC Numaranizi Giriniz" 16 51 2>/tmp/musteriBilgi.txt
+d2=$?
+if [ $d2 -eq 1 ];then
+        anaEkranFunc
+fi
+TcNo=`cat /tmp/musteriBilgi.txt`
+
+$DIALOG --title "Telefon" --inputbox "Telefon Numaranizi Giriniz" 16 51 2>/tmp/musteriBilgi.txt
+d3=$?
+if [ $d3 -eq 1 ];then
+        anaEkranFunc
+fi
+Telefon=`cat /tmp/musteriBilgi.txt`
+
+$DIALOG --title "Email" --inputbox "Emailinizi Giriniz" 16 51 2>/tmp/musteriBilgi.txt
+d4=$?
+if [ $d4 -eq 1 ];then
+        anaEkranFunc
+fi
+Email=`cat /tmp/musteriBilgi.txt`
+
+dat=$(dialog --stdout --title "Dogum Tarihi" --calendar "Dogum Tarihinizi Giriniz:" 0 0 03 10 1994)
+d9=$?
+if [ $d9 -eq 1 ];then
+        anaEkranFunc
+fi
+
+Bakiye=0
+if [ $Ad != "" -a $Soyad != "" -a $Sifre != "" -a $TcNo != "" ];then
+	sqlite3 $database "insert into tblmusteriler (Sifre,Adi,Soyadi,TcNo,Bakiye,Telefon,Email,dTarihi) values ('$Sifre','$Ad','$Soyad','$TcNo','$Bakiye','$Telefon','$Email','$dat');"
+	$DIALOG --title "Basarili" --msgbox "Kaydiniz Eklenmistir" 5 50
+	anaEkranFunc
+else
+	 $DIALOG --title "HATA!!" --msgbox "Kayit Basarisiz Degerler Bos Olamaz" 5 50
+	yeniKayitFunc
+fi
+}
+#Kullanici Girisi
+girisFunc(){
+
+$DIALOG --title "TcNo" --inputbox "TC Numaranizi Giriniz" 16 51 2>/tmp/kullaniciGiris.txt
+opt=$?
+TcNo=`cat /tmp/kullaniciGiris.txt`
+
+case $opt in
+1) anaEkranFunc;;
+esac
+
+$DIALOG --title "Sifre" --inputbox "Sifrenizi Giriniz" 16 51 2>/tmp/kullaniciGiris.txt
+d5=$?
+Sifre=`cat /tmp/kullaniciGiris.txt`
+
+if [ $d5 -eq 1 ];then
+	anaEkranFunc
+fi
+
+gelenSifre=`sqlite3 $database "SELECT Sifre FROM tblmusteriler WHERE TcNo='${TcNo}'"`;
+if [ $Sifre != 0 -a $TcNo != "" ];then
+	if [ $Sifre == $gelenSifre ];then
+		musteriIslemleriFunc "\${TcNo}"
+	else
+		$DIALOG --title "ERROR" --msgbox "Yanlis TcNo ya da Sifre" 5 50
+		girisFunc
+	fi
+else
+	$DIALOG --title "HATA!!" --msgbox "TcNo ya da Sifre Bos Olamaz" 5 50
+	girisFunc
+fi
+}
+
+databaseFunc(){
+#Veritabani Islemleri
+clear
+if [[ -z $( type -p sqlite3 ) ]]; then echo -e "HATA!!: sqlite3 -- YUKLU DEGIL !";exit ;fi
+
+# Veritabani varmi kontrol et yoksa olustur
+database="/home/ogrenci/Banka/bankamatik.db"
+ if [ -e "$database" ];then
+     echo ""
+ else
+     echo "Datase does not exist - Creating now"
+ sqlite3 $database "create table tblmusteriler (id INTEGER PRIMARY KEY AUTOINCREMENT,Sifre TEXT NOT NULL,Adi TEXT NOT NULL,Soyadi TEXT NOT NULL,TcNo TEXT NOT NULL,Bakiye INTEGER,Telefon TEXT NOT NULL,Email TEXT,dTarihi TEXT);"
+    echo "Database created at $database"
+ fi
+#dialog --title 'Message' --msgbox 'Hello, world!' 5 20
+}
+
+anaEkranFunc(){
+#Giris Ekrani
+DIALOG=${DIALOG=dialog}
+tempfile=`tempfile 2>/dev/null` || tempfile=/tmp/test$$
+trap "rm -f $tempfile" 0 1 2 5 15
+
+$DIALOG --clear --title "Ana Ekran" \
+        --menu "Birini Secin" 20 51 2 \
+        1 "Giris Yap" \
+        2 "Yeni Kayit" 2>/tmp/menuitem.txt
+	scp=$?
+choice=`cat /tmp/menuitem.txt`
+
+if [ $scp -eq 1 ];then
+	exit 0
+fi
+
+case $choice in
+1)
+girisFunc
+;;
+2)
+yeniKayitFunc
+;;
+esac
+}
+
+databaseFunc
+anaEkranFunc
